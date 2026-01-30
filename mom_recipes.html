@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SparkleChef - המטבח החכם</title>
+	
+    <!-- Tab Icon (Lucide Chef-Hat as SVG) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23f43f5e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z'/%3E%3Cline x1='6' x2='18' y1='17' y2='17'/%3E%3C/svg%3E">
+
+
+    <!-- Styles & Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Icons Library -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- File Parsing Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <style>
+        body { font-family: 'Assistant', sans-serif; background-color: #f8fafc; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        .slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .lucide { width: 1.25rem; height: 1.25rem; }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; height: auto; overflow: visible; }
+            #main-area { position: static; overflow: visible; padding: 0; }
+        }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden text-slate-800">
+
+    <!-- Sidebar -->
+    <aside class="w-72 bg-white border-l border-slate-100 flex flex-col z-20 shadow-sm shrink-0 no-print">
+        <div class="p-8 pb-6">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg">
+                    <i data-lucide="chef-hat"></i>
+                </div>
+                <h1 class="font-black text-2xl tracking-tight">SparkleChef</h1>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mr-14 tracking-widest uppercase">Smart Kitchen AI</p>
+        </div>
+
+        <div class="px-6 py-4">
+            <button onclick="openImporter()" class="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-black shadow-lg hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 group">
+                <i data-lucide="plus" class="stroke-[3]"></i>
+                <span>הוסף מתכון</span>
+            </button>
+        </div>
+
+        <nav id="categories-container" class="flex-1 overflow-y-auto px-4 py-4 space-y-1 custom-scroll">
+            <!-- Categories injected via JS -->
+        </nav>
+
+        <div class="p-6 border-t border-slate-50">
+            <button onclick="resetApiKey()" class="flex items-center justify-end gap-2 text-[10px] font-bold text-slate-300 hover:text-red-500 uppercase tracking-widest transition-colors w-full">
+                <span>איפוס מפתח API</span>
+                <i data-lucide="key" class="w-3 h-3"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col h-full relative bg-slate-50">
+        <!-- Header -->
+        <header class="h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-10 shrink-0 z-10 sticky top-0 no-print">
+            <div class="flex items-center gap-6 flex-1 max-w-3xl">
+                <div class="relative flex-1 group">
+                    <i data-lucide="search" class="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-slate-500 transition-colors"></i>
+                    <input id="search-input" oninput="renderApp()" class="w-full bg-slate-100/50 focus:bg-white border-none rounded-2xl pr-14 pl-6 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-slate-100 transition-all" placeholder="חפשו מתכון, רכיב או תגיות...">
+                </div>
+                
+                <div class="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
+                    <i data-lucide="clock" class="text-slate-400 w-4 h-4"></i>
+                    <select id="time-filter" onchange="renderApp()" class="bg-transparent font-bold text-xs text-slate-600 outline-none cursor-pointer w-24">
+                        <option value="">כל הזמנים</option>
+                        <option value="15">עד 15 דק'</option>
+                        <option value="30">עד 30 דק'</option>
+                        <option value="60">עד שעה</option>
+                        <option value="120">עד שעתיים</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main View Area -->
+        <main id="main-area" class="flex-1 overflow-y-auto p-10 custom-scroll relative">
+            <!-- Content Injected via JS -->
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <!-- Modal Content Injected Here -->
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="hidden fixed inset-0 z-[60] bg-white/95 backdrop-blur-xl flex flex-col items-center justify-center">
+        <div class="w-16 h-16 border-4 border-slate-100 border-t-rose-500 rounded-full animate-spin mb-6"></div>
+        <h3 class="text-2xl font-black text-slate-800 mb-2">השף עובד על זה...</h3>
+        <p id="loading-text" class="text-slate-400 font-medium">מנתח את המידע</p>
+    </div>
+
+    <script>
+        // --- State Management ---
+        let recipes = JSON.parse(localStorage.getItem('sparkle_recipes')) || [];
+        let view = 'gallery'; 
+        let selectedRecipeId = null;
+        let categoryFilter = 'הכל';
+        let apiKey = localStorage.getItem('gemini_api_key') || "";
+        let multiplier = 1;
+        let conversionMode = 'original'; // 'original', 'metric', 'household'
+
+        const categories = ['הכל', 'עיקריות', 'קינוחים', 'סלטים', 'מרקים', 'מאפים', 'טבעוני', 'בשרי', 'דגים'];
+        
+        const conversions = { 
+            'כוס': 240, 
+            'כף': 15, 
+            'כפית': 5, 
+            'קג': 1000, 
+            'ק"ג': 1000,
+            'ליטר': 1000,
+            'גרם': 1,
+            'מ"ל': 1,
+            'גר': 1,
+            "גר'": 1,
+            'מל': 1
+        };
+
+        const reverseConversions = [
+            { threshold: 180, unit: 'כוס', div: 240 },
+            { threshold: 10, unit: 'כף', div: 15 },
+            { threshold: 0, unit: 'כפית', div: 5 }
+        ];
+
+        // --- Core Logic ---
+
+        function saveRecipes() {
+            localStorage.setItem('sparkle_recipes', JSON.stringify(recipes));
+            renderApp();
+        }
+
+        function createRecipe(data) {
+            const newRecipe = { ...data, id: Date.now().toString(), createdAt: Date.now() };
+            recipes.unshift(newRecipe);
+            saveRecipes();
+            viewRecipe(newRecipe.id);
+        }
+
+        function updateRecipe(id, data) {
+            const idx = recipes.findIndex(r => r.id === id);
+            if (idx !== -1) {
+                recipes[idx] = { ...recipes[idx], ...data };
+                saveRecipes();
+                if (view === 'detail' && selectedRecipeId === id) renderApp();
+            }
+        }
+
+        function deleteRecipe(id) {
+            if (confirm('האם למחוק את המתכון לצמיתות?')) {
+                recipes = recipes.filter(r => r.id !== id);
+                saveRecipes();
+                setView('gallery');
+            }
+        }
+
+        function setView(v) {
+            view = v;
+            if (v === 'gallery') selectedRecipeId = null;
+            renderApp();
+        }
+
+        function setCategory(cat) {
+            categoryFilter = cat;
+            setView('gallery');
+        }
+
+        function getMinutes(timeStr) {
+            if (!timeStr) return 999;
+            const num = parseInt(timeStr.replace(/\D/g, ''));
+            if (timeStr.includes('שעה') || timeStr.includes('hour')) return isNaN(num) ? 60 : num * 60;
+            return isNaN(num) ? 999 : num;
+        }
+
+        function parseAmount(str) {
+            if (!str) return null;
+            const s = String(str).trim();
+            if (s.includes('/')) {
+                const parts = s.split('/');
+                return parseFloat(parts[0]) / parseFloat(parts[1]);
+            }
+            const n = parseFloat(s);
+            return isNaN(n) ? null : n;
+        }
+
+        function formatNum(n) {
+            if (n === null || n === undefined) return "";
+            if (Math.abs(n - 0.5) < 0.01) return "1/2";
+            if (Math.abs(n - 0.25) < 0.01) return "1/4";
+            if (Math.abs(n - 0.75) < 0.01) return "3/4";
+            if (Math.abs(n - 0.33) < 0.02) return "1/3";
+            return n.toFixed(1).toString().replace('.0', '');
+        }
+
+        // --- API & File Logic ---
+
+        async function fetchWithRetry(url, options, retries = 3) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const res = await fetch(url, options);
+                    if (res.ok) return await res.json();
+                } catch(e) {}
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            throw new Error("API Failed");
+        }
+
+        async function runGemini(promptText, useSearch = false, imgBase64 = null) {
+            if (!apiKey) {
+                apiKey = prompt("הכנס מפתח API של Google Gemini:");
+                if (!apiKey) throw new Error("No API Key");
+                localStorage.setItem('gemini_api_key', apiKey);
+            }
+
+            document.getElementById('loading-screen').classList.remove('hidden');
+            document.getElementById('loading-text').innerText = useSearch ? 'סורק את האינטרנט...' : 'מפענח מתכון...';
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const systemPrompt = `
+                You are a professional chef. Extract the recipe from the provided source. Output VALID JSON ONLY in Hebrew.
+                If it's a website link, you MUST also extract the original source URL.
+                Format: { "title": "", "description": "", "prepTime": "30 דק", "servings": "4", "difficulty": "קל/בינוני/קשה", "ingredients": [{"item":"", "amount":"", "unit":""}], "instructions": ["step 1"], "tags": [], "imageUrl": "", "sourceUrl": "MANDATORY IF LINK PROVIDED" }
+            `;
+
+            const parts = [{ text: promptText }];
+            if (imgBase64) parts.push({ inlineData: { mimeType: "image/jpeg", data: imgBase64 }});
+
+            const payload = {
+                contents: [{ parts }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { responseMimeType: "application/json" }
+            };
+            if (useSearch) payload.tools = [{ "google_search": {} }];
+
+            try {
+                const data = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const text = data.candidates[0].content.parts[0].text;
+                return JSON.parse(text);
+            } catch (e) {
+                alert("שגיאה: " + e.message);
+                return null;
+            } finally {
+                document.getElementById('loading-screen').classList.add('hidden');
+            }
+        }
+
+        async function extractFileText(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext === 'txt' || ext === 'md') return await file.text();
+            if (ext === 'pdf') {
+                const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
+                let text = "";
+                for(let i=1; i<=pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    text += (await page.getTextContent()).items.map(s => s.str).join(" ") + "\n";
+                }
+                return text;
+            }
+            if (ext === 'docx') {
+                const res = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+                return res.value;
+            }
+            return "";
+        }
+
+        // --- Render Functions ---
+
+        function renderApp() {
+            renderSidebar();
+            const main = document.getElementById('main-area');
+            if (view === 'gallery') {
+                main.innerHTML = getGalleryHTML();
+            } else if (view === 'detail') {
+                main.innerHTML = getDetailHTML(selectedRecipeId);
+            }
+            lucide.createIcons();
+        }
+
+        function renderSidebar() {
+            const container = document.getElementById('categories-container');
+            container.innerHTML = `
+                <div class="text-[10px] font-black text-slate-300 px-4 mb-2 uppercase tracking-wider">קטגוריות</div>
+                ${categories.map(cat => `
+                    <button onclick="setCategory('${cat}')" class="w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${categoryFilter === cat ? 'bg-rose-50 text-rose-600' : 'text-slate-500 hover:bg-slate-50'}">
+                        ${cat}
+                        ${categoryFilter === cat ? '<span class="w-1.5 h-1.5 bg-rose-600 rounded-full"></span>' : ''}
+                    </button>
+                `).join('')}
+            `;
+        }
+
+        function getGalleryHTML() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const timeLimit = document.getElementById('time-filter').value;
+            
+            const filtered = recipes.filter(r => {
+                const matchSearch = (r.title||'').toLowerCase().includes(search);
+                const matchCat = categoryFilter === 'הכל' || (r.tags||[]).includes(categoryFilter);
+                const matchTime = !timeLimit || getMinutes(r.prepTime) <= parseInt(timeLimit);
+                return matchSearch && matchCat && matchTime;
+            });
+
+            if (filtered.length === 0) return `
+                <div class="flex flex-col items-center justify-center h-full opacity-40 mt-20">
+                    <i data-lucide="utensils-cross" class="w-16 h-16 mb-4"></i>
+                    <p class="text-xl font-bold">המדף ריק...</p>
+                </div>
+            `;
+
+            return `
+                <div class="max-w-7xl mx-auto animate-in fade-in">
+                    <div class="mb-8 flex items-baseline justify-between">
+                        <h2 class="text-3xl font-black text-slate-800">${categoryFilter}</h2>
+                        <span class="text-slate-400 font-bold">${filtered.length} מתכונים</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 pb-20">
+                        ${filtered.map(r => `
+                            <div onclick="viewRecipe('${r.id}')" class="group bg-white rounded-[2rem] overflow-hidden cursor-pointer shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border border-slate-50 flex flex-col h-full">
+                                <div class="h-48 relative overflow-hidden bg-slate-100">
+                                    ${r.imageUrl ? `<img src="${r.imageUrl}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">` : `<div class="w-full h-full flex items-center justify-center text-slate-300"><i data-lucide="image" class="w-10 h-10"></i></div>`}
+                                    <div class="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm border border-slate-100">${r.difficulty || 'בינוני'}</div>
+                                </div>
+                                <div class="p-6 flex-1 flex flex-col">
+                                    <h3 class="text-lg font-black text-slate-800 mb-2 leading-tight line-clamp-1 group-hover:text-rose-600 transition-colors">${r.title}</h3>
+                                    <p class="text-xs text-slate-500 line-clamp-2 mb-4 flex-1 font-medium leading-relaxed">${r.description || ''}</p>
+                                    <div class="flex items-center gap-4 text-[10px] font-bold text-slate-400 pt-4 border-t border-slate-50">
+                                        <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> ${r.prepTime || '--'}</span>
+                                        <span class="flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> ${r.servings || '--'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function viewRecipe(id) {
+            selectedRecipeId = id;
+            multiplier = 1;
+            conversionMode = 'original';
+            setView('detail');
+        }
+
+        function getDetailHTML(id) {
+            const r = recipes.find(x => x.id === id);
+            if (!r) return '';
+
+            const ingredientsHTML = (r.ingredients || []).map(ing => {
+                let amt = parseAmount(ing.amount);
+                let unit = (ing.unit || '').trim();
+                let displayAmt = amt !== null ? amt * multiplier : ing.amount;
+                let displayUnit = unit;
+
+                if (amt !== null) {
+                    if (conversionMode === 'metric') {
+                        if (conversions[unit] && conversions[unit] > 1) {
+                            displayAmt = displayAmt * conversions[unit];
+                            displayUnit = (unit.includes('ליטר') || unit.includes('מל')) ? 'מ"ל' : 'גרם';
+                        }
+                    } else if (conversionMode === 'household') {
+                        const isMetricUnit = ['גרם', 'גר', 'מ"ל', 'מל'].some(u => unit.includes(u));
+                        if (isMetricUnit) {
+                            const val = displayAmt;
+                            const match = reverseConversions.find(c => val >= c.threshold);
+                            if (match) {
+                                displayAmt = val / match.div;
+                                displayUnit = match.unit;
+                            }
+                        }
+                    }
+                }
+
+                const formattedAmt = amt !== null ? formatNum(displayAmt) : displayAmt;
+
+                return `
+                    <li class="flex items-baseline justify-between p-2 rounded-xl hover:bg-slate-50 border-b border-dashed border-slate-100 last:border-0 group transition-colors">
+                        <span class="font-bold text-slate-700 group-hover:text-slate-900">${ing.item}</span>
+                        <span class="font-black text-rose-500 whitespace-nowrap text-lg dir-ltr">
+                            ${formattedAmt} <span class="text-[10px] text-slate-400 font-black uppercase">${displayUnit}</span>
+                        </span>
+                    </li>
+                `;
+            }).join('');
+
+            return `
+                <div class="max-w-4xl mx-auto slide-up pb-10">
+                    <button onclick="setView('gallery')" class="mb-4 flex items-center gap-2 text-slate-400 hover:text-slate-800 font-black transition-colors">
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i> חזרה
+                    </button>
+
+                    <div class="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-slate-100">
+                        <div class="h-[28vh] relative bg-slate-900">
+                            ${r.imageUrl ? `<img src="${r.imageUrl}" class="w-full h-full object-cover opacity-90">` : `<div class="w-full h-full flex items-center justify-center text-slate-600"><i data-lucide="image" class="w-16 h-16"></i></div>`}
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                            
+                            <div class="absolute bottom-0 left-0 w-full p-8 text-white">
+                                <div class="flex gap-2 mb-2">
+                                    ${(r.tags || []).map(t => `<span class="px-2 py-0.5 bg-white/20 backdrop-blur-md rounded text-[9px] font-black uppercase tracking-widest">${t}</span>`).join('')}
+                                </div>
+                                <h1 class="text-4xl font-black mb-3 leading-tight">${r.title}</h1>
+                                <div class="flex flex-wrap gap-3 text-xs font-bold opacity-90">
+                                    <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm"><i data-lucide="clock" class="w-3.5 h-3.5"></i> ${r.prepTime}</span>
+                                    <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm"><i data-lucide="users" class="w-3.5 h-3.5"></i> ${r.servings} מנות</span>
+                                    ${r.sourceUrl ? `<a href="${r.sourceUrl}" target="_blank" class="flex items-center gap-2 bg-rose-500 text-white px-4 py-1.5 rounded-full hover:bg-rose-600 shadow-lg transition-all"><i data-lucide="external-link" class="w-3.5 h-3.5"></i> מקור</a>` : ''}
+                                </div>
+                            </div>
+
+                            <div class="absolute top-6 left-6 flex gap-2 no-print">
+                                <button onclick="window.print()" class="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white hover:bg-white hover:text-slate-900 transition-all shadow-lg"><i data-lucide="printer" class="w-4 h-4"></i></button>
+                                <button onclick="openEditor('${r.id}')" class="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white hover:bg-white hover:text-slate-900 transition-all shadow-lg"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                                <button onclick="deleteRecipe('${r.id}')" class="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white hover:bg-red-500 transition-all shadow-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="p-8">
+                            <div class="flex flex-wrap gap-3 mb-8 p-3 bg-slate-50 rounded-xl items-center border border-slate-100 no-print">
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">כמות:</span>
+                                <div class="flex bg-white rounded-lg p-1 shadow-sm border border-slate-100">
+                                    ${[0.5, 1, 1.5, 2, 3].map(m => `<button onclick="setMultiplier(${m})" class="px-3 py-1 rounded text-[11px] font-black transition-all ${multiplier === m ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-50'}">x${m}</button>`).join('')}
+                                </div>
+                                <div class="w-px h-5 bg-slate-200 mx-1"></div>
+                                <div class="flex gap-2">
+                                    <button onclick="toggleConversion('metric')" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${conversionMode === 'metric' ? 'bg-rose-100 text-rose-600 shadow-inner' : 'bg-white text-slate-500 shadow-sm border border-slate-100'}">
+                                        <i data-lucide="scale" class="w-3.5 h-3.5"></i> למשקל
+                                    </button>
+                                    <button onclick="toggleConversion('household')" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${conversionMode === 'household' ? 'bg-rose-100 text-rose-600 shadow-inner' : 'bg-white text-slate-500 shadow-sm border border-slate-100'}">
+                                        <i data-lucide="coffee" class="w-3.5 h-3.5"></i> לכוסות
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="grid md:grid-cols-[1fr_1.4fr] gap-10">
+                                <div>
+                                    <h3 class="text-xl font-black text-slate-900 mb-5 border-b-2 border-slate-100 pb-3 flex items-center gap-2"><i data-lucide="shopping-basket" class="text-rose-500 w-5 h-5"></i> רכיבים</h3>
+                                    <ul class="space-y-1">${ingredientsHTML}</ul>
+                                    ${r.notes ? `
+                                        <div class="mt-8 bg-amber-50 p-4 rounded-xl border border-amber-100 relative">
+                                            <h4 class="font-black text-amber-900 mb-1 text-[10px] uppercase tracking-wider">טיפ מהשף</h4>
+                                            <p class="text-amber-800/80 italic text-sm leading-relaxed">${r.notes}</p>
+                                        </div>
+                                    ` : ''}
+                                </div>
+
+                                <div>
+                                    <h3 class="text-xl font-black text-slate-900 mb-5 border-b-2 border-slate-100 pb-3 flex items-center gap-2"><i data-lucide="list-ordered" class="text-rose-500 w-5 h-5"></i> הכנה</h3>
+                                    <div class="space-y-5">
+                                        ${(r.instructions || []).map((step, i) => `
+                                            <div class="flex gap-4 group">
+                                                <div class="shrink-0 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xs group-hover:bg-slate-900 group-hover:text-white transition-colors shadow-sm border border-slate-200">${i + 1}</div>
+                                                <p class="text-md text-slate-600 leading-relaxed font-medium pt-0.5">${step}</p>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function setMultiplier(m) { multiplier = m; renderApp(); }
+
+        // Logic fix: toggle back to 'original' if already in the selected mode
+        function toggleConversion(mode) { 
+            conversionMode = (conversionMode === mode) ? 'original' : mode; 
+            renderApp(); 
+        }
+
+        // --- Modals Logic ---
+
+        function openImporter() {
+            showModal(`
+                <div class="relative w-full max-w-xl bg-white rounded-[2rem] p-10 shadow-2xl">
+                    <button onclick="closeModal()" class="absolute top-6 left-6 text-slate-300 hover:text-slate-800 font-bold text-xl transition-colors">✕</button>
+                    <h2 class="text-3xl font-black text-center mb-8 text-slate-800">מאיפה המתכון?</h2>
+                    
+                    <div class="grid grid-cols-4 gap-3 mb-8">
+                        <button onclick="setImportTab('link')" id="tab-link" class="import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all">
+                            <i data-lucide="link"></i> <span class="text-[9px] font-black uppercase tracking-widest">קישור</span>
+                        </button>
+                        <button onclick="setImportTab('text')" id="tab-text" class="import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all">
+                            <i data-lucide="type"></i> <span class="text-[9px] font-black uppercase tracking-widest">טקסט</span>
+                        </button>
+                        <button onclick="setImportTab('image')" id="tab-image" class="import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all">
+                            <i data-lucide="camera"></i> <span class="text-[9px] font-black uppercase tracking-widest">תמונה</span>
+                        </button>
+                        <button onclick="setImportTab('file')" id="tab-file" class="import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all">
+                            <i data-lucide="file-text"></i> <span class="text-[9px] font-black uppercase tracking-widest">קובץ</span>
+                        </button>
+                    </div>
+
+                    <div id="import-content" class="bg-slate-50 p-6 rounded-3xl mb-8 min-h-[100px] flex flex-col justify-center border border-slate-100">
+                        <!-- Content Injected -->
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button onclick="openEditor()" class="flex-1 py-3.5 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-colors">יצירה ידנית</button>
+                        <button onclick="runImportAI()" class="flex-[2] py-3.5 bg-slate-900 text-white rounded-2xl font-black shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            <span>צור מתכון חכם</span>
+                        </button>
+                    </div>
+                </div>
+            `);
+            setImportTab('link');
+        }
+
+        let currentImportType = 'link';
+        let importFileBase64 = null;
+
+        function setImportTab(type) {
+            currentImportType = type;
+            document.querySelectorAll('.import-tab').forEach(el => {
+                el.className = 'import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 border-slate-100 text-slate-400 hover:bg-slate-50 transition-all cursor-pointer';
+            });
+            const active = document.getElementById(`tab-${type}`);
+            active.className = 'import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 border-slate-900 bg-white text-slate-900 shadow-md transition-all cursor-pointer';
+
+            const content = document.getElementById('import-content');
+            if (type === 'link') {
+                content.innerHTML = `<input id="input-link" class="w-full p-4 rounded-xl border-none outline-none shadow-sm font-medium" placeholder="הדבק כאן כתובת אתר..." autofocus>`;
+            } else if (type === 'text') {
+                content.innerHTML = `<textarea id="input-text" class="w-full h-28 p-4 rounded-xl border-none outline-none shadow-sm font-medium resize-none" placeholder="הדבק כאן את הטקסט של המתכון..."></textarea>`;
+            } else if (type === 'image') {
+                content.innerHTML = `
+                    <div onclick="document.getElementById('file-upload').click()" class="border-2 border-dashed border-slate-300 rounded-2xl h-28 flex flex-col items-center justify-center cursor-pointer hover:border-rose-400 hover:bg-rose-50 transition-all group">
+                        <i data-lucide="image-plus" class="w-6 h-6 mb-2 text-slate-300 group-hover:text-rose-400"></i>
+                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">לחץ להעלאת תמונה</span>
+                        <input type="file" id="file-upload" class="hidden" accept="image/*" onchange="handleFileSelect(this, 'image')">
+                    </div>
+                    <p id="file-name" class="text-center text-xs font-bold mt-2 text-rose-500"></p>
+                `;
+            } else if (type === 'file') {
+                content.innerHTML = `
+                    <div onclick="document.getElementById('file-upload').click()" class="border-2 border-dashed border-slate-300 rounded-2xl h-28 flex flex-col items-center justify-center cursor-pointer hover:border-slate-900 hover:bg-slate-100 transition-all group">
+                        <i data-lucide="file-up" class="w-6 h-6 mb-2 text-slate-300 group-hover:text-slate-900"></i>
+                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">PDF, DOCX, TXT</span>
+                        <input type="file" id="file-upload" class="hidden" accept=".pdf,.docx,.txt" onchange="handleFileSelect(this, 'file')">
+                    </div>
+                    <p id="file-name" class="text-center text-xs font-bold mt-2 text-slate-900"></p>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        async function handleFileSelect(input, type) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('file-name').innerText = file.name;
+            if (type === 'image') {
+                const reader = new FileReader();
+                reader.onload = e => { importFileBase64 = e.target.result.split(',')[1]; };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function runImportAI() {
+            let prompt = "";
+            let base64 = null;
+            let useSearch = false;
+            let sourceUrl = null;
+
+            if (currentImportType === 'link') {
+                sourceUrl = document.getElementById('input-link').value;
+                if (!sourceUrl) return alert("אנא הזן לינק");
+                prompt = `Extract professional recipe from URL: ${sourceUrl}`;
+                useSearch = true;
+            } else if (currentImportType === 'text') {
+                const txt = document.getElementById('input-text').value;
+                if (!txt) return alert("אנא הזן טקסט");
+                prompt = `Extract recipe from text: ${txt}`;
+            } else if (currentImportType === 'image') {
+                if (!importFileBase64) return alert("אנא בחר תמונה");
+                prompt = "Extract full recipe details from this image";
+                base64 = importFileBase64;
+            } else if (currentImportType === 'file') {
+                const fileInput = document.getElementById('file-upload');
+                if (!fileInput.files[0]) return alert("אנא בחר קובץ");
+                const text = await extractFileText(fileInput.files[0]);
+                prompt = `Extract recipe from this document text: ${text}`;
+            }
+
+            const data = await runGemini(prompt, useSearch, base64);
+            if (data) {
+                if (currentImportType === 'image') data.imageUrl = "data:image/jpeg;base64," + base64;
+                if (sourceUrl) data.sourceUrl = sourceUrl;
+                openEditor(null, data);
+            }
+        }
+
+        function openEditor(id = null, prefillData = null) {
+            let data = { title: '', description: '', prepTime: '', servings: '', difficulty: 'בינוני', ingredients: [], instructions: [], tags: [], imageUrl: '', sourceUrl: '', notes: '' };
+            if (id) data = recipes.find(r => r.id === id);
+            else if (prefillData) data = { ...data, ...prefillData };
+
+            const renderIngs = () => (data.ingredients || []).map(ing => `
+                <div class="flex gap-2 mb-2 ing-row slide-up">
+                    <input class="w-16 p-2 bg-slate-50 rounded-lg text-center font-bold text-sm" placeholder="כמות" value="${ing.amount||''}">
+                    <input class="w-16 p-2 bg-slate-50 rounded-lg text-center text-sm" placeholder="יח'" value="${ing.unit||''}">
+                    <input class="flex-1 p-2 bg-slate-50 rounded-lg text-sm font-medium" placeholder="שם הרכיב" value="${ing.item||''}">
+                    <button onclick="this.parentElement.remove()" class="text-slate-300 hover:text-red-500 transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+            `).join('');
+
+            const renderInsts = () => (data.instructions || []).map(inst => `
+                <div class="flex gap-2 mb-2 inst-row slide-up">
+                    <textarea class="flex-1 p-3 bg-slate-50 rounded-xl text-sm font-medium resize-none h-16 shadow-inner">${inst}</textarea>
+                    <button onclick="this.parentElement.remove()" class="text-slate-300 hover:text-red-500 self-center transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+            `).join('');
+
+            showModal(`
+                <div class="bg-white rounded-[2rem] w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden shadow-2xl relative">
+                    <div class="p-5 border-b flex justify-between items-center bg-white sticky top-0 z-10">
+                        <h2 class="text-xl font-black text-slate-800">עריכת מתכון</h2>
+                        <button onclick="closeModal()" class="p-2 hover:bg-slate-100 rounded-full transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-8 space-y-8 custom-scroll" id="editor-form">
+                        <div class="flex gap-6">
+                            <div class="w-1/4">
+                                <div class="aspect-square bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden relative group">
+                                    <img id="preview-img" src="${data.imageUrl || ''}" class="w-full h-full object-cover ${!data.imageUrl ? 'hidden' : ''}">
+                                    <div class="absolute inset-0 flex flex-col items-center justify-center ${data.imageUrl ? 'opacity-0 group-hover:opacity-100 bg-black/20 text-white' : ''} transition-all">
+                                        <i data-lucide="image-plus"></i>
+                                    </div>
+                                </div>
+                                <input id="edit-img" class="w-full mt-3 p-2 bg-slate-50 rounded-lg text-[10px]" placeholder="URL של תמונה" value="${data.imageUrl||''}" oninput="document.getElementById('preview-img').src=this.value; document.getElementById('preview-img').classList.remove('hidden')">
+                            </div>
+                            <div class="flex-1 space-y-4">
+                                <input id="edit-title" class="text-3xl font-black w-full outline-none border-b-2 border-transparent focus:border-slate-100 placeholder:text-slate-200" value="${data.title}" placeholder="שם המנה...">
+                                <textarea id="edit-desc" class="w-full h-16 resize-none outline-none text-slate-500 font-medium text-md leading-relaxed" placeholder="תיאור קצר...">${data.description||''}</textarea>
+                                
+                                <div class="grid grid-cols-3 gap-3">
+                                    <div class="bg-slate-50 p-2.5 rounded-xl">
+                                        <label class="text-[9px] font-black text-slate-400 block mb-0.5 uppercase tracking-wider">זמן</label>
+                                        <input id="edit-time" class="w-full bg-transparent font-black outline-none text-sm" value="${data.prepTime||''}" placeholder="30 דק'">
+                                    </div>
+                                    <div class="bg-slate-50 p-2.5 rounded-xl">
+                                        <label class="text-[9px] font-black text-slate-400 block mb-0.5 uppercase tracking-wider">מנות</label>
+                                        <input id="edit-servings" class="w-full bg-transparent font-black outline-none text-sm" value="${data.servings||''}" placeholder="4">
+                                    </div>
+                                    <div class="bg-slate-50 p-2.5 rounded-xl">
+                                        <label class="text-[9px] font-black text-slate-400 block mb-0.5 uppercase tracking-wider">קושי</label>
+                                        <select id="edit-diff" class="w-full bg-transparent font-black outline-none text-sm">
+                                            <option ${data.difficulty==='קל'?'selected':''}>קל</option>
+                                            <option ${data.difficulty==='בינוני'?'selected':''}>בינוני</option>
+                                            <option ${data.difficulty==='קשה'?'selected':''}>קשה</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="flex gap-3">
+                                    <div class="bg-slate-50 p-2.5 rounded-xl flex-1">
+                                        <label class="text-[9px] font-black text-slate-400 block mb-0.5 uppercase tracking-wider">תגיות</label>
+                                        <input id="edit-tags" class="w-full bg-transparent font-bold outline-none text-xs" value="${(data.tags||[]).join(', ')}">
+                                    </div>
+                                    <div class="bg-slate-50 p-2.5 rounded-xl flex-1">
+                                        <label class="text-[9px] font-black text-slate-400 block mb-0.5 uppercase tracking-wider">לינק למקור</label>
+                                        <input id="edit-source" class="w-full bg-transparent font-bold outline-none text-xs text-blue-500 dir-ltr text-right" value="${data.sourceUrl||''}" placeholder="https://...">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-10">
+                            <section>
+                                <h3 class="font-black text-lg mb-3 flex items-center gap-2"><i data-lucide="shopping-basket" class="w-4 h-4"></i> רכיבים</h3>
+                                <div id="ing-list" class="space-y-1.5">${renderIngs()}</div>
+                                <button onclick="addIngInput()" class="w-full py-2.5 mt-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-black text-[10px] hover:border-slate-900 hover:text-slate-900 transition-all">+ רכיב</button>
+                            </section>
+                            <section>
+                                <h3 class="font-black text-lg mb-3 flex items-center gap-2"><i data-lucide="list-ordered" class="w-4 h-4"></i> הכנה</h3>
+                                <div id="inst-list" class="space-y-1.5">${renderInsts()}</div>
+                                <button onclick="addInstInput()" class="w-full py-2.5 mt-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-black text-[10px] hover:border-slate-900 hover:text-slate-900 transition-all">+ שלב</button>
+                            </section>
+                        </div>
+                        
+                        <div class="bg-amber-50 p-5 rounded-2xl border border-amber-100">
+                             <label class="text-[9px] font-black text-amber-800 block mb-1 uppercase tracking-widest">הערות</label>
+                             <textarea id="edit-notes" class="w-full bg-transparent outline-none text-amber-900 h-16 resize-none font-medium text-sm leading-relaxed">${data.notes||''}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="p-5 border-t bg-white flex justify-end gap-3">
+                        <button onclick="closeModal()" class="px-6 py-2.5 text-slate-400 font-bold hover:bg-slate-50 rounded-xl transition-colors">ביטול</button>
+                        <button onclick="submitRecipe('${id || ''}')" class="px-8 py-2.5 bg-slate-900 text-white rounded-xl font-black shadow-lg hover:scale-105 active:scale-95 transition-all">שמור</button>
+                    </div>
+                </div>
+            `);
+            lucide.createIcons();
+        }
+
+        function addIngInput() {
+            const div = document.createElement('div');
+            div.className = "flex gap-2 mb-2 ing-row slide-up";
+            div.innerHTML = `
+                <input class="w-16 p-2 bg-slate-50 rounded-lg text-center font-bold text-sm" placeholder="כמות">
+                <input class="w-16 p-2 bg-slate-50 rounded-lg text-center text-sm" placeholder="יח'">
+                <input class="flex-1 p-2 bg-slate-50 rounded-lg text-sm font-medium" placeholder="שם הרכיב">
+                <button onclick="this.parentElement.remove()" class="text-slate-300 hover:text-red-500"><i data-lucide="x" class="w-4 h-4"></i></button>
+            `;
+            document.getElementById('ing-list').appendChild(div);
+            lucide.createIcons();
+        }
+
+        function addInstInput() {
+            const div = document.createElement('div');
+            div.className = "flex gap-2 mb-2 inst-row slide-up";
+            div.innerHTML = `
+                <textarea class="flex-1 p-3 bg-slate-50 rounded-xl text-sm font-medium resize-none h-16 shadow-inner"></textarea>
+                <button onclick="this.parentElement.remove()" class="text-slate-300 hover:text-red-500 self-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+            `;
+            document.getElementById('inst-list').appendChild(div);
+            lucide.createIcons();
+        }
+
+        function submitRecipe(id) {
+            const title = document.getElementById('edit-title').value;
+            if(!title) return alert("חובה להזין שם למתכון");
+
+            const ingredients = Array.from(document.querySelectorAll('.ing-row')).map(row => {
+                const inputs = row.querySelectorAll('input');
+                return { amount: inputs[0].value, unit: inputs[1].value, item: inputs[2].value };
+            }).filter(x => x.item);
+
+            const instructions = Array.from(document.querySelectorAll('.inst-row textarea')).map(x => x.value).filter(x => x);
+            const tags = document.getElementById('edit-tags').value.split(',').map(t=>t.trim()).filter(t=>t);
+
+            const data = {
+                title,
+                description: document.getElementById('edit-desc').value,
+                prepTime: document.getElementById('edit-time').value,
+                servings: document.getElementById('edit-servings').value,
+                difficulty: document.getElementById('edit-diff').value,
+                imageUrl: document.getElementById('edit-img').value,
+                sourceUrl: document.getElementById('edit-source').value,
+                notes: document.getElementById('edit-notes').value,
+                ingredients,
+                instructions,
+                tags: tags.length ? tags : ['כללי']
+            };
+
+            if (id) updateRecipe(id, data);
+            else createRecipe(data);
+            closeModal();
+        }
+
+        function showModal(html) {
+            const overlay = document.getElementById('modal-overlay');
+            overlay.innerHTML = html;
+            overlay.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+        }
+
+        function resetApiKey() {
+            if(confirm("למחוק את מפתח ה-API מהזכרון?")) {
+                localStorage.removeItem('gemini_api_key');
+                location.reload();
+            }
+        }
+
+        // --- Init ---
+        window.onload = () => {
+            renderApp();
+            lucide.createIcons();
+        };
+
+    </script>
+</body>
+</html>
