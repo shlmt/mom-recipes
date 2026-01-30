@@ -325,7 +325,7 @@
             setView('gallery');
         }
 
-        // Drag & Drop Logic
+// Drag & Drop Logic
         function handleDragStart(ev, id) {
             ev.dataTransfer.setData("text/plain", id);
             ev.target.classList.add("recipe-card-dragging");
@@ -422,14 +422,14 @@
             }
 
             document.getElementById('loading-screen').classList.remove('hidden');
-            document.getElementById('loading-text').innerText = useSearch ? 'סורק את האינטרנט...' : 'מפענח מתכון...';
+            document.getElementById('loading-text').innerText = 'מפענח מתכון...';
 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
             const systemPrompt = `
                 You are a professional chef. Extract the recipe from the provided source. Output VALID JSON ONLY in Hebrew.
                 If it's a website link, you MUST also extract the original source URL.
-                Format: { "title": "", "description": "", "prepTime": "x דק", "difficulty": "קל/בינוני/קשה", "ingredients": [{"item":"", "amount":"", "unit":""}], "instructions": ["step 1"], "tags": [], "imageUrl": "", "sourceUrl": "MANDATORY IF LINK PROVIDED", imageUrl: "MANDATORY IF THERE IS IMAGE IN WEB PAGE" }
+                Format: { "title": "", "description": "", "prepTime": "x דק", "difficulty": "קל/בינוני/קשה", "servings": "4 or תבנית 20*30 or 4 אנגליש קייק", "ingredients": [{"item":"", "amount":"", "unit":""}], "instructions": ["step 1"], "tags": [], "imageUrl": "", "sourceUrl": "MANDATORY IF LINK PROVIDED", imageUrl: "MANDATORY IF THERE IS IMAGE IN WEB PAGE" }
             `;
 
             const parts = [{ text: promptText }];
@@ -438,9 +438,18 @@
             const payload = {
                 contents: [{ parts }],
                 systemInstruction: { parts: [{ text: systemPrompt }] },
-                generationConfig: { responseMimeType: "application/json" }
+                generationConfig: { 
+                    temperature: 0.1 
+                }
             };
-            if (useSearch) payload.tools = [{ "google_search": {} }];
+
+            if (useSearch) {
+                // If using tools, do NOT enforce mime type application/json
+                payload.tools = [{ "google_search": {} }];
+            } else {
+                // Only enforce for non-tool requests
+                payload.generationConfig.responseMimeType = "application/json";
+            }
 
             try {
                 const data = await fetchWithRetry(url, {
@@ -448,9 +457,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                const text = data.candidates[0].content.parts[0].text;
+                
+                let text = data.candidates[0].content.parts[0].text;
+                // Cleanup potentially wrapped markdown JSON if coming from search
+                text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                
                 return JSON.parse(text);
             } catch (e) {
+                console.error(e);
                 showToast("שגיאת AI: " + e.message, "error");
                 return null;
             } finally {
@@ -744,13 +758,13 @@
                 content.innerHTML = `<input id="input-link" class="w-full p-4 rounded-xl border-none outline-none shadow-sm font-medium" placeholder="הדבק כאן כתובת אתר..." autofocus>`;
             } else if (type === 'text') {
                 content.innerHTML = `<textarea id="input-text" class="w-full h-28 p-4 rounded-xl border-none outline-none shadow-sm font-medium resize-none" placeholder="הדבק כאן את הטקסט של המתכון..."></textarea>`;
-            } else if (type === 'file') {
+                        } else if (type === 'file') {
                 content.innerHTML = `
                     <div onclick="document.getElementById('file-upload').click()" class="border-2 border-dashed border-slate-300 rounded-2xl h-28 flex flex-col items-center justify-center cursor-pointer hover:border-slate-900 hover:bg-slate-100 transition-all group overflow-hidden relative">
                         <img id="image-preview-import" class="absolute inset-0 w-full h-full object-cover hidden">
                         <div id="file-upload-inner" class="flex flex-col items-center justify-center z-10 bg-white/50 backdrop-blur-sm p-4 rounded-xl">
                             <i data-lucide="plus-circle" class="w-6 h-6 mb-2 text-slate-300 group-hover:text-slate-900"></i>
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">העלה תמונה או מסמך</span>
+                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">העלה תמונה או מסמך</span>
                         </div>
                         <input type="file" id="file-upload" class="hidden" accept="image/*,.pdf,.docx,.txt" onchange="handleFileSelect(this)">
                     </div>
@@ -803,14 +817,14 @@
                 promptText = `Extract recipe from text: ${txt}`;
             } else if (currentImportType === 'file') {
                 if (!importFileData) return showToast("אנא בחר קובץ", "error");
-                
+
                 if (importFileData.type.startsWith('image/')) {
-                    promptText = "Extract full recipe details from this image";
-                    base64 = importFileBase64;
-                } else {
+                promptText = "Extract full recipe details from this image";
+                base64 = importFileBase64;
+            } else {
                     const text = await extractFileText(importFileData);
-                    promptText = `Extract recipe from this document text: ${text}`;
-                }
+                promptText = `Extract recipe from this document text: ${text}`;
+            }
             }
 
             const data = await runGemini(promptText, useSearch, base64);
@@ -824,7 +838,7 @@
         // --- Editor Logic ---
 
         function openEditor(id = null, prefillData = null) {
-            let data = { title: '', description: '', prepTime: '', servings: '', difficulty: 'בינוני', ingredients: [], instructions: [], tags: [], imageUrl: '', sourceUrl: '', notes: '' };
+            let data = { title: '', description: '', prepTime: '', servings: '', difficulty: '', ingredients: [], instructions: [], tags: [], imageUrl: '', sourceUrl: '', notes: '' };
             if (id) data = recipes.find(r => r.id === id);
             else if (prefillData) data = { ...data, ...prefillData };
 
