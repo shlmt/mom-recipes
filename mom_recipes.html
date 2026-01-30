@@ -38,12 +38,6 @@
         
         .lucide { width: 1.25rem; height: 1.25rem; }
 
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white; height: auto; overflow: visible; }
-            #main-area { position: static; overflow: visible; padding: 0; }
-        }
-
         .insert-divider {
             height: 4px;
             margin: -2px 0;
@@ -109,6 +103,28 @@
         .recipe-card-dragging {
             opacity: 0.5;
             cursor: grabbing;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; height: auto; overflow: visible; font-size: 11pt; color: black; }
+            #main-area { position: static; overflow: visible; padding: 0 !important; }
+            
+            /* Print Specific Overrides */
+            h1 { font-size: 22pt !important; margin-bottom: 0.2rem !important; color: black !important; }
+            h3 { font-size: 14pt !important; margin-bottom: 0.5rem !important; color: black !important; border-bottom: 1px solid #000 !important; padding-bottom: 2px !important; }
+            p { font-size: 10pt !important; line-height: 1.3 !important; color: #333 !important; margin-bottom: 1rem !important; }
+            
+            /* Ensure layout fits */
+            .grid { display: grid !important; }
+            .gap-10 { gap: 1.5rem !important; }
+            
+            /* Hide decorative elements */
+            ::-webkit-scrollbar { display: none; }
+            button { display: none !important; }
+            
+            /* Force white background and black text */
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
     </style>
 </head>
@@ -325,7 +341,7 @@
             setView('gallery');
         }
 
-// Drag & Drop Logic
+        // Drag & Drop Logic
         function handleDragStart(ev, id) {
             ev.dataTransfer.setData("text/plain", id);
             ev.target.classList.add("recipe-card-dragging");
@@ -623,24 +639,27 @@
 
             return `
                 <div class="max-w-4xl mx-auto slide-up pb-10">
-                    <button onclick="setView('gallery')" class="mb-4 flex items-center gap-2 text-slate-400 hover:text-slate-800 font-black transition-colors">
+                    <button onclick="setView('gallery')" class="mb-4 flex items-center gap-2 text-slate-400 hover:text-slate-800 font-black transition-colors no-print">
                         <i data-lucide="arrow-right" class="w-4 h-4"></i> חזרה
                     </button>
 
-                    <div class="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-slate-100">
-                        <div class="h-[28vh] relative bg-slate-900">
-                            ${r.imageUrl ? `<img src="${r.imageUrl}" class="w-full h-full object-cover opacity-90">` : `<div class="w-full h-full flex items-center justify-center text-slate-600"><i data-lucide="image" class="w-16 h-16"></i></div>`}
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                    <div class="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-slate-100 print:shadow-none print:border-none print:rounded-none">
+                        <div class="h-[28vh] relative bg-slate-900 print:h-auto print:bg-white">
+                            <!-- Image hidden on print -->
+                            <div class="print:hidden h-full w-full absolute inset-0">
+                                ${r.imageUrl ? `<img src="${r.imageUrl}" class="w-full h-full object-cover opacity-90">` : `<div class="w-full h-full flex items-center justify-center text-slate-600"><i data-lucide="image" class="w-16 h-16"></i></div>`}
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                            </div>
                             
-                            <div class="absolute bottom-0 left-0 w-full p-8 text-white">
+                            <div class="absolute bottom-0 left-0 w-full p-8 text-white print:static print:text-black print:p-0 print:mb-4">
                                 <div class="flex gap-2 mb-2">
-                                    ${(r.tags || []).map(t => `<span class="px-2 py-0.5 bg-white/20 backdrop-blur-md rounded text-[9px] font-black uppercase tracking-widest">${t}</span>`).join('')}
+                                    ${(r.tags || []).map(t => `<span class="px-2 py-0.5 bg-white/20 backdrop-blur-md rounded text-[9px] font-black uppercase tracking-widest print:bg-slate-100 print:text-slate-900">${t}</span>`).join('')}
                                 </div>
-                                <h1 class="text-4xl font-black mb-3 leading-tight">${r.title}</h1>
-                                <div class="flex flex-wrap gap-3 text-xs font-bold opacity-90">
-                                    <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm"><i data-lucide="clock" class="w-3.5 h-3.5"></i> ${r.prepTime}</span>
-                                    <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm"><i data-lucide="users" class="w-3.5 h-3.5"></i> ${r.servings} מנות</span>
-                                    ${r.sourceUrl ? `<a href="${r.sourceUrl}" target="_blank" class="flex items-center gap-2 bg-rose-500 text-white px-4 py-1.5 rounded-full hover:bg-rose-600 shadow-lg transition-all"><i data-lucide="external-link" class="w-3.5 h-3.5"></i> מקור</a>` : ''}
+                                <h1 class="text-4xl font-black mb-3 leading-tight print:text-3xl">${r.title}</h1>
+                                <div class="flex flex-wrap gap-3 text-xs font-bold opacity-90 print:opacity-100">
+                                    <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm print:bg-slate-100 print:text-slate-900"><i data-lucide="clock" class="w-3.5 h-3.5"></i> ${r.prepTime}</span>
+                                    <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm print:bg-slate-100 print:text-slate-900"><i data-lucide="users" class="w-3.5 h-3.5"></i> ${r.servings} מנות</span>
+                                    ${r.sourceUrl ? `<a href="${r.sourceUrl}" target="_blank" class="flex items-center gap-2 bg-rose-500 text-white px-4 py-1.5 rounded-full hover:bg-rose-600 shadow-lg transition-all print:hidden"><i data-lucide="external-link" class="w-3.5 h-3.5"></i> מקור</a>` : ''}
                                 </div>
                             </div>
 
@@ -651,7 +670,7 @@
                             </div>
                         </div>
 
-                        <div class="p-8">
+                        <div class="p-8 print:p-0">
                             <div class="flex flex-wrap gap-3 mb-8 p-3 bg-slate-50 rounded-xl items-center border border-slate-100 no-print">
                                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">כמות:</span>
                                 <div class="flex bg-white rounded-lg p-1 shadow-sm border border-slate-100">
@@ -668,25 +687,25 @@
                                 </div>
                             </div>
 
-                            <div class="grid md:grid-cols-[1fr_1.4fr] gap-10">
+                            <div class="grid md:grid-cols-[1fr_1.4fr] gap-10 print:grid-cols-[1fr_2fr] print:gap-8">
                                 <div>
-                                    <h3 class="text-xl font-black text-slate-900 mb-5 border-b-2 border-slate-100 pb-3 flex items-center gap-2"><i data-lucide="shopping-basket" class="text-rose-500 w-5 h-5"></i> רכיבים</h3>
+                                    <h3 class="text-xl font-black text-slate-900 mb-5 border-b-2 border-slate-100 pb-3 flex items-center gap-2"><i data-lucide="shopping-basket" class="text-rose-500 w-5 h-5 print:text-black"></i> רכיבים</h3>
                                     <ul class="space-y-1">${ingredientsHTML}</ul>
                                     ${r.notes ? `
-                                        <div class="mt-8 bg-amber-50 p-4 rounded-xl border border-amber-100 relative">
-                                            <h4 class="font-black text-amber-900 mb-1 text-[10px] uppercase tracking-wider">טיפ מהשף</h4>
-                                            <p class="text-amber-800/80 italic text-sm leading-relaxed">${r.notes}</p>
+                                        <div class="mt-8 bg-amber-50 p-4 rounded-xl border border-amber-100 relative print:bg-transparent print:border print:border-dashed print:border-slate-300">
+                                            <h4 class="font-black text-amber-900 mb-1 text-[10px] uppercase tracking-wider print:text-black">טיפ מהשף</h4>
+                                            <p class="text-amber-800/80 italic text-sm leading-relaxed print:text-black">${r.notes}</p>
                                         </div>
                                     ` : ''}
                                 </div>
 
                                 <div>
-                                    <h3 class="text-xl font-black text-slate-900 mb-5 border-b-2 border-slate-100 pb-3 flex items-center gap-2"><i data-lucide="list-ordered" class="text-rose-500 w-5 h-5"></i> הכנה</h3>
-                                    <div class="space-y-5">
+                                    <h3 class="text-xl font-black text-slate-900 mb-5 border-b-2 border-slate-100 pb-3 flex items-center gap-2"><i data-lucide="list-ordered" class="text-rose-500 w-5 h-5 print:text-black"></i> הכנה</h3>
+                                    <div class="space-y-5 print:space-y-3">
                                         ${(r.instructions || []).map((step, i) => `
                                             <div class="flex gap-4 group">
-                                                <div class="shrink-0 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xs group-hover:bg-slate-900 group-hover:text-white transition-colors shadow-sm border border-slate-200">${i + 1}</div>
-                                                <p class="text-md text-slate-600 leading-relaxed font-medium pt-0.5">${step}</p>
+                                                <div class="shrink-0 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xs shadow-sm border border-slate-200 print:bg-transparent print:border-black print:text-black">${i + 1}</div>
+                                                <p class="text-md text-slate-600 leading-relaxed font-medium pt-0.5 print:text-black">${step}</p>
                                             </div>
                                         `).join('')}
                                     </div>
@@ -717,13 +736,13 @@
                         <button onclick="setImportTab('link')" id="tab-link" class="import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all">
                             <i data-lucide="link"></i> <span class="text-[9px] font-black uppercase tracking-widest">קישור</span>
                         </button>
-                        <button onclick="setImportTab('file')" id="tab-file" class="import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all">
+<button onclick="setImportTab('file')" id="tab-file" class="import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all">
                             <i data-lucide="upload-cloud"></i> <span class="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">קובץ או תמונה</span>
                         </button>
                         <button onclick="setImportTab('text')" id="tab-text" class="import-tab flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all">
                             <i data-lucide="type"></i> <span class="text-[9px] font-black uppercase tracking-widest">טקסט</span>
                         </button>
-                    </div>
+                                            </div>
 
                     <div id="import-content" class="bg-slate-50 p-6 rounded-3xl mb-8 min-h-[100px] flex flex-col justify-center border border-slate-100">
                         <!-- Content Injected -->
@@ -793,7 +812,7 @@
                     inner.classList.add('hidden');
                 };
                 reader.readAsDataURL(file);
-            } else {
+} else {
                 preview.classList.add('hidden');
                 inner.classList.remove('hidden');
                 importFileBase64 = null;
@@ -825,7 +844,7 @@
                     const text = await extractFileText(importFileData);
                 promptText = `Extract recipe from this document text: ${text}`;
             }
-            }
+}
 
             const data = await runGemini(promptText, useSearch, base64);
             if (data) {
