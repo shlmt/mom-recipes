@@ -211,8 +211,52 @@
 
         const categories = ['הכל', 'בשרי', 'דגים', 'עוגות', 'עוגות גבינה', 'פינוקים', 'חלבי', 'מאפים', 'סלטים' ];
         
-        const conversions = { 'כוס': 240, 'כוסות': 240, 'כף': 15, 'כפות': 15, 'כפיות': 15, 'כפית': 5, 'קג': 1000, 'ק"ג': 1000, 'ליטר': 1000, 'גרם': 1, 'מ"ל': 1, 'גר': 1, "גר'": 1, 'מל': 1 };
-        const reverseConversions = [{ threshold: 180, unit: 'כוס', div: 240 }, { threshold: 10, unit: 'כף', div: 15 }, { threshold: 0, unit: 'כפית', div: 5 }];
+        // מילון שממיר את כל סוגי הכתיב בעברית למפתח אחיד באנגלית לצורך החישוב
+        const hebrewToKey = {
+            'כוס': 'cup', 'כוסות': 'cup',
+            'כף': 'tbsp', 'כפות': 'tbsp',
+            'כפית': 'tsp', 'כפיות': 'tsp',
+            'גרם': 'metric', 'גר': 'metric', "גר'": 'metric', 'ג\'': 'metric',
+            'מל': 'metric', 'מ"ל': 'metric', 'ml': 'metric'
+        };
+
+        // מילון להמרה חזרה מאנגלית לעברית (לתצוגה סופית)
+        const keyToHebrew = {
+            'cup': 'כוס',
+            'tbsp': 'כף',
+            'tsp': 'כפית'
+        };
+
+        // מסד הנתונים (הערכים נשארים באנגלית כמפתחות, אבל נדע לתרגם את התוצאה)
+        const conversionDB = {
+            // פורמט: { cup: גרם_לכוס, tbsp: גרם_לכף, type: 'weight'/'volume' }
+            'קמח קורנפלור קקאו': { cup: 140, tbsp: 10, type: 'weight' }, 
+            'קמח מלא': { cup: 125, tbsp: 8, type: 'weight' },
+            'סוכר': { cup: 200, tbsp: 10, type: 'weight' },
+            'אבקת סוכר': { cup: 120, tbsp: 8, type: 'weight' },
+            'סוכר חום': { cup: 240, tbsp: 15, type: 'weight' }, 
+            'שמן': { cup: 200, tbsp: 15, type: 'weight' },
+            'דבש סילאן': { cup: 360, tbsp: 20, type: 'weight' },
+            'אינסטנט פודינג וניל': { tbsp: 10, type: 'weight' },
+            "שמרים אבקת אפייה מלח סודה לשתיה ג'לטין": { tsp: 5, type: 'weight' },
+            'סולת': { cup: 200, tbsp: 10, type: 'weight' },
+            'מים חלב שמנת מתוקה מייפל': { cup: 240, tbsp: 15, type: 'volume' },
+            'שמן': { cup: 200, type: 'volume' },
+            'ריבת חלב חלבה': { cup: 400, type: 'weight' },
+            "שוקולד צ'יפס": { cup: 200, type: 'weight' },
+        };
+
+        // ברירת מחדל לרכיבים לא מוכרים (כמו המרת מים)
+        const defaultData = { cup: 240, tbsp: 15, tsp: 5, type: 'volume' };
+
+        function getRate(name) {
+            if (!name) return defaultData;
+            // מחפש התאמה חלקית (למשל "קמח לבן" ימצא את "קמח")
+            for (let key in conversionDB) {
+                if (name.includes(key)) return conversionDB[key];
+            }
+            return defaultData;
+        }
 
         // --- Custom UI Elements ---
 
@@ -289,12 +333,12 @@
             viewRecipe(newRecipe.id);
         }
 
-        function updateRecipe(id, data, showToast=true) {
+        function updateRecipe(id, data, show=true) {
             const idx = recipes.findIndex(r => r.id === id);
             if (idx !== -1) {
                 recipes[idx] = { ...recipes[idx], ...data };
                 saveRecipes();
-                showToast && showToast("המתכון עודכן");
+                show && showToast("המתכון עודכן");
                 if (view === 'detail' && selectedRecipeId === id) renderApp();
             }
         }
@@ -384,24 +428,72 @@
             return isNaN(num) ? 999 : num;
         }
 
+        const FRACTIONS = {
+            '⅒': 1/10,
+            '⅑': 1/9,
+            '⅛': 1/8,
+            '⅐': 1/7,
+            '⅙': 1/6,
+            '⅕': 1/5,
+            '¼': 1/4,
+            '⅓': 1/3,
+            '⅜': 3/8,
+            '⅖': 2/5,
+            '½': 1/2,
+            '⅗': 3/5,
+            '⅝': 5/8,
+            '⅔': 2/3,
+            '¾': 3/4,
+            '⅘': 4/5,
+            '⅚': 5/6,
+            '⅞': 7/8
+        };
+
+
         function parseAmount(str) {
             if (!str) return null;
-            const s = String(str).trim();
-            if (s.includes('/')) {
-                const parts = s.split('/');
-                return parseFloat(parts[0]) / parseFloat(parts[1]);
+            let s = String(str).trim();
+
+            // מספר רגיל
+            if (!isNaN(s)) return parseFloat(s);
+
+            // שבר יוניקוד בלבד (½)
+            if (FRACTIONS[s]) return FRACTIONS[s];
+
+            // מספר + שבר (1½, 2⅓)
+            for (let f in FRACTIONS) {
+                if (s.endsWith(f)) {
+                    const whole = parseFloat(s.replace(f, '')) || 0;
+                    return whole + FRACTIONS[f];
+                }
             }
-            const n = parseFloat(s);
-            return isNaN(n) ? null : n;
+
+            // שבר רגיל (1/2)
+            if (s.includes('/')) {
+                const [a, b] = s.split('/');
+                const na = parseFloat(a);
+                const nb = parseFloat(b);
+                if (!isNaN(na) && !isNaN(nb) && nb !== 0) {
+                    return na / nb;
+                }
+            }
+
+            return null;
         }
+
 
         function formatNum(n) {
             if (n === null || n === undefined) return "";
-            if (Math.abs(n - 0.5) < 0.01) return "1/2";
-            if (Math.abs(n - 0.25) < 0.01) return "1/4";
-            if (Math.abs(n - 0.75) < 0.01) return "3/4";
-            if (Math.abs(n - 0.33) < 0.02) return "1/3";
-            return n.toFixed(1).toString().replace('.0', '');
+
+            if (n < 1) {
+                for (const [sym, val] of Object.entries(FRACTIONS)) {
+                    if (Math.abs(n - val) < 0.02) {
+                        return sym;
+                    }
+                }
+            }
+
+            return n.toFixed(1).replace('.0', '');
         }
 
         // --- AI Logic ---
@@ -524,7 +616,7 @@
                         ondragover="handleDragOver(event)"
                         ondragleave="handleDragLeave(event)"
                         ondrop="handleDrop(event, '${cat}')"
-                        class="w-full text-right px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between border border-transparent ${categoryFilter === cat ? 'bg-rose-50 text-rose-600' : 'text-slate-500 hover:bg-slate-50'}">
+                        class="w-full text-right px-4 py-3 rounded-xl text-sm font-bold cursor-pointer transition-all flex items-center justify-between border border-transparent ${categoryFilter === cat ? 'bg-rose-50 text-rose-600' : 'text-slate-500 hover:bg-slate-50'}">
                         ${cat}
                         ${categoryFilter === cat ? '<span class="w-1.5 h-1.5 bg-rose-600 rounded-full"></span>' : ''}
                     </button>
@@ -592,31 +684,62 @@
 
             const ingredientsHTML = (r.ingredients || []).map(ing => {
                 let amt = parseAmount(ing.amount);
-                let unit = (ing.unit || '').trim();
-                let displayAmt = amt !== null ? amt * multiplier : ing.amount;
-                let displayUnit = unit;
+                let originalUnit = (ing.unit || '').trim(); // היחידה המקורית בעברית
+                
+                // שלב 1: נרמול היחידה למפתח אנגלי (למשל: 'כוסות' -> 'cup')
+                const unitKey = hebrewToKey[originalUnit] || 
+                    Object.keys(hebrewToKey).find(k => originalUnit.includes(k)) 
+                    ? hebrewToKey[Object.keys(hebrewToKey).find(k => originalUnit.includes(k))]
+                    : null;
 
-                if (amt !== null) {
+
+                let displayAmt = amt !== null ? amt * multiplier : ing.amount;
+                let displayUnit = originalUnit;
+
+                // שליפת נתוני המרה לרכיב הספציפי
+                const data = getRate(ing.name || ing.item);
+
+                if (amt !== null && unitKey) {
+
+                    // --- תרחיש א': המשתמש רוצה משקל (גרמים/מ"ל) ---
                     if (conversionMode === 'metric') {
-                        if (conversions[unit] && conversions[unit] > 1) {
-                            displayAmt = displayAmt * conversions[unit];
-                            displayUnit = (unit.includes('ליטר') || unit.includes('מל')) ? 'מ"ל' : 'גרם';
+                        // אם היחידה הנוכחית היא כלי בית (כוס/כף) ויש לה ערך המרה
+                        if (unitKey !== 'metric' && data[unitKey]) {
+                            displayAmt = displayAmt * data[unitKey];
+                            
+                            // כאן מתבצע התרגום הסופי לעברית:
+                            // אם הסוג הוא 'volume' -> נציג מ"ל, אחרת -> גרם
+                            displayUnit = (data.type === 'volume') ? 'מ"ל' : 'גרם';
                         }
-                    } else if (conversionMode === 'household') {
-                        const isMetricUnit = ['גרם', 'גר', 'מ"ל', 'מל'].some(u => unit.includes(u));
-                        if (isMetricUnit) {
-                            const val = displayAmt;
-                            const match = reverseConversions.find(c => val >= c.threshold);
-                            if (match) {
-                                displayAmt = val / match.div;
-                                displayUnit = match.unit;
+                    }
+                    
+                    // --- תרחיש ב': המשתמש רוצה כלי מדידה (כוסות/כפות) ---
+                    else if (conversionMode === 'household') {
+                        // ממירים רק אם היחידה הנוכחית היא מטרית (גרם/מ"ל)
+                        if (unitKey === 'metric') {
+                            const currentVal = displayAmt;
+                            
+                            // סדר בדיקה מהגדול לקטן
+                            const checkOrder = ['cup', 'tbsp', 'tsp'];
+                            
+                            for (let u of checkOrder) {
+                                if (data[u]) {
+                                    let res = currentVal / data[u];
+                                    // אם התוצאה הגיונית (לפחות רבע יחידה)
+                                    if (res >= 0.25) {
+                                        displayAmt = res;
+                                        displayUnit = keyToHebrew[u];
+                                        break;
+                                    }
+                                }
                             }
+                            // אם לא נמצאה התאמה, נשאר עם היחידה המקורית
                         }
                     }
                 }
 
                 const formattedAmt = amt !== null ? formatNum(displayAmt) : displayAmt;
-
+    
                 return `
                     <li class="flex items-baseline justify-between p-2 rounded-xl hover:bg-slate-50 border-b border-dashed border-slate-100 last:border-0 group transition-colors">
                         <span class="font-bold text-slate-700 group-hover:text-slate-900">${ing.item}</span>
@@ -648,7 +771,7 @@
                                 <h1 class="text-4xl font-black mb-3 leading-tight print:text-3xl">${r.title}</h1>
                                 <div class="flex flex-wrap gap-3 text-xs font-bold opacity-90 print:opacity-100">
                                     <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm print:bg-slate-100 print:text-slate-900"><i data-lucide="clock" class="w-3.5 h-3.5"></i> ${r.prepTime}</span>
-                                    <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm print:bg-slate-100 print:text-slate-900"><i data-lucide="users" class="w-3.5 h-3.5"></i> ${r.servings} מנות</span>
+                                    <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm print:bg-slate-100 print:text-slate-900"><i data-lucide="users" class="w-3.5 h-3.5"></i> ${r.servings} ${isNaN(r.servings) ? '' : 'מנות'}</span>
                                     ${r.sourceUrl ? `<a href="${r.sourceUrl}" target="_blank" class="flex items-center gap-2 bg-rose-500 text-white px-4 py-1.5 rounded-full hover:bg-rose-600 shadow-lg transition-all print:hidden"><i data-lucide="external-link" class="w-3.5 h-3.5"></i> מקור</a>` : ''}
                                 </div>
                             </div>
