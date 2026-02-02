@@ -171,10 +171,23 @@
             <!-- Categories injected via JS -->
         </nav>
 
-        <div class="p-6 border-t border-slate-50">
-            <button onclick="confirmResetApiKey()" class="flex items-center justify-end gap-2 text-[10px] font-bold text-slate-300 hover:text-red-500 uppercase tracking-widest transition-colors w-full">
-                <span>איפוס מפתח API</span>
+        <div class="p-6 pb-2 border-t border-slate-50 space-y-3">
+            <div class="flex items-center justify-between px-1">
+                <button onclick="exportData()" class="flex items-center gap-2 text-[10px] font-bold text-slate-300 hover:text-blue-500 uppercase tracking-widest transition-colors">
+                    <i data-lucide="download" class="w-3 h-3"></i>
+                    <span>הורדת גיבוי</span>
+                </button>
+                
+                <button onclick="document.getElementById('importFile').click()" class="flex items-center gap-2 text-[10px] font-bold text-slate-300 hover:text-green-500 uppercase tracking-widest transition-colors">
+                    <i data-lucide="upload" class="w-3 h-3"></i>
+                    <span>שחזור מקובץ</span>
+                </button>
+                <input type="file" id="importFile" class="hidden" accept=".json" onchange="importData(event)">
+            </div>
+
+            <button onclick="confirmResetApiKey()" class="flex items-center justify-end gap-2 text-[10px] font-bold text-slate-300 hover:text-red-500 uppercase tracking-widest transition-colors">
                 <i data-lucide="key" class="w-3 h-3"></i>
+                <span>איפוס מפתח API</span>
             </button>
         </div>
     </aside>
@@ -354,6 +367,59 @@
                     setView('gallery');
                 }
             });
+        }
+
+        function exportData() {
+            const data = localStorage.getItem('sparkle_recipes')
+            if (!data || data === '[]') {
+                showToast("אין נתונים לשמירה", "error");
+                return;
+            }
+
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const date = new Date().toISOString().slice(0, 10);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backup_recipes_${date}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast("הנתונים נשמרו לקובץ בהצלחה!");
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    
+                    if (Array.isArray(json) || (typeof json === 'object')) {
+                        confirm = showConfirmDialog({
+                            title: "שחזור נתונים",
+                            message: "האם לשחזר נתונים מהקובץ? המידע הקיים בדפדפן יימחק!",
+                            onConfirm: () => {
+                                const data = Array.isArray(json) ? json : json.recipes || [];
+                                localStorage.setItem('sparkle_recipes', JSON.stringify(json));
+                                showToast("הנתונים שוחזרו בהצלחה!");
+                                location.reload();
+                            }
+                        });
+                    } else {
+                        showToast("מבנה הקובץ אינו תקין", "error");
+                    }
+                } catch (err) {
+                    showToast("שגיאה בקריאת הקובץ: וודא שזהו קובץ JSON תקין", "error");
+                }
+            };
+            reader.readAsText(file);
+            
+            event.target.value = '';
         }
 
         function confirmResetApiKey() {
