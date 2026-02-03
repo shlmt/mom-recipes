@@ -2,6 +2,8 @@ const CACHE_NAME = 'my-pwa-cache';
 const FILES_TO_CACHE = [
   'index.html',
   'manifest.json',
+  'libs/lucide.js',
+  'libs/tailwind.css'
 ];
 
 // התקנה: מאחסן הכל מראש
