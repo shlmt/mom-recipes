@@ -839,12 +839,12 @@
                     <div class="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-slate-100 print:shadow-none print:border-none print:rounded-none">
                         <div class="h-[28vh] relative bg-slate-900 no-print">
                             <!-- Image hidden on print -->
-                            <div class="print:hidden h-full w-full absolute inset-0">
+                            <div class="print:hidden h-full w-full absolute inset-0 z-0">
                                 ${r.imageUrl ? `<img src="${r.imageUrl}" class="w-full h-full object-cover opacity-90">` : `<div class="w-full h-full flex items-center justify-center text-slate-600"><i data-lucide="image" class="w-16 h-16"></i></div>`}
                                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
                             </div>
                             
-                            <div class="bottom-0 left-0 w-full p-8 text-white" style='padding-top:80px'>
+                            <div class="absolute inset-0 flex flex-col justify-end p-8 text-white z-10">
                                 <div class="flex gap-2 mb-4">
                                     ${(r.tags || []).map(t => `
                                         <span class="px-2 py-0.5 bg-white/20 backdrop-blur-md rounded text-[9px] font-black uppercase tracking-widest">
@@ -865,7 +865,7 @@
                                 </div>
                             </div>
 
-                            <div class="absolute top-6 left-6 flex gap-2">
+                            <div class="absolute top-6 left-6 flex gap-2 z-20">
                                 <button onclick="window.print()" class="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white hover:bg-white hover:text-slate-900 transition-all shadow-lg"><i data-lucide="printer" class="w-4 h-4"></i></button>
                                 <button onclick="openEditor('${r.id}')" class="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white hover:bg-white hover:text-slate-900 transition-all shadow-lg"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                                 <button onclick="deleteRecipe('${r.id}')" class="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white hover:bg-red-500 transition-all shadow-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
