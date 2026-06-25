@@ -1053,7 +1053,10 @@
 
             return `
                     <li class="flex items-baseline justify-between p-2 text-md rounded-xl hover:bg-slate-50 border-b border-dashed border-slate-100 last:border-0 group transition-colors">
-                        <span class="font-bold text-slate-700 group-hover:text-slate-900">${ing.item}</span>
+                        <label class="flex items-center gap-3">
+                            <input type="checkbox" class="w-4 h-4 rounded border-slate-300 focus:ring-rose-500" style="accent-color: var(--color-rose-600);" />
+                            <span class="font-bold text-slate-700 group-hover:text-slate-900">${ing.item}</span>
+                        </label>
                         <span class="font-black text-rose-500 whitespace-nowrap text-lg dir-ltr">
                             ${formattedAmt} <span class="text-[10px] text-slate-400 font-black uppercase">${displayUnit}</span>
                         </span>
