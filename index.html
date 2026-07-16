@@ -483,7 +483,7 @@
         סוכר: { cup: 200, tbsp: 10, type: "weight" },
         "אבקת סוכר": { cup: 120, tbsp: 8, type: "weight" },
         "סוכר חום": { cup: 240, tbsp: 15, type: "weight" },
-        שמן: { cup: 200, tbsp: 15, type: "weight" },
+        // שמן: { cup: 200, tbsp: 15, type: "weight" },
         "דבש סילאן": { cup: 360, tbsp: 20, type: "weight" },
         "אינסטנט פודינג וניל": { tbsp: 10, type: "weight" },
         "שמרים אבקת אפייה מלח סודה לשתיה ג'לטין": { tsp: 5, type: "weight" },
@@ -499,9 +499,13 @@
 
       function getRate(name) {
         if (!name) return defaultData;
-        // מחפש התאמה חלקית (למשל "קמח לבן" ימצא את "קמח")
+        const lookup = String(name).toLowerCase().trim();
         for (let key in conversionDB) {
-          if (name.includes(key)) return conversionDB[key];
+          const lowerKey = key.toLowerCase();
+          // חיפוש מדויק קודם, ואחר כך חיפוש חלקי בשני הכיוונים
+          if (lookup === lowerKey || lookup.includes(lowerKey) || lowerKey.includes(lookup)) {
+            return conversionDB[key];
+          }
         }
         return defaultData;
       }
