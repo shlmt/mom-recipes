@@ -1212,13 +1212,13 @@
                             </div>
 
                             <div class="grid md:grid-cols-[1fr_1.4fr] gap-10 print:grid-cols-[1fr_2fr] print:gap-8">
-                                <div>
+                                <div class="flex flex-col h-full min-h-0">
                                     <h3 class="text-xl font-black text-slate-900 mb-5 border-b-2 border-slate-100 pb-3 flex items-center gap-2"><i data-lucide="shopping-basket" class="text-rose-500 w-5 h-5 print:text-black"></i> רכיבים</h3>
-                                    <ul class="space-y-1">${ingredientsHTML}</ul>
+                                    <ul class="space-y-1 flex-1">${ingredientsHTML}</ul>
                                     ${
                                       r.notes
                                         ? `
-                                        <div class="mt-8 bg-amber-50 p-4 rounded-xl border border-amber-100 relative print:bg-transparent print:border print:border-dashed print:border-slate-300">
+                                        <div class="mt-auto bg-amber-50 p-4 rounded-xl border border-amber-100 relative print:bg-transparent print:border print:border-dashed print:border-slate-300">
                                             <h4 class="font-black text-amber-900 mb-1 text-[10px] uppercase tracking-wider print:text-black">טיפ מהשף</h4>
                                             <p class="text-amber-800/80 italic text-sm leading-relaxed print:text-black">${r.notes}</p>
                                         </div>
